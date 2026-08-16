@@ -92,11 +92,6 @@ function(lite_deploy_application _target)
                 -always-overwrite
             COMMENT "Deploy Qt"
         )
-        add_custom_command(TARGET ${_target} POST_BUILD
-            COMMAND bash ${LITE_SOURCE_DIR}/scripts/fix_macos_dylib_paths.sh
-                "$<TARGET_BUNDLE_DIR:${_target}>" "1"
-            COMMENT "Fix dylib paths"
-        )
     endif()
 
     if(APPLE)
@@ -170,6 +165,24 @@ function(lite_deploy_application _target)
                 $<TARGET_FILE_DIR:${_target}>/../lib/plugins
                 $<TARGET_FILE_DIR:dsinfer::srt-ds-infer>/../lib
             COMMENT "Fix deployed plugin RPATHs"
+        )
+    endif()
+
+    if(APPLE)
+        # Must run after all qm_add_copy_command steps above so the script can
+        # see and fix every dylib that was copied into PlugIns.
+        add_custom_command(TARGET ${_target} POST_BUILD
+            COMMAND bash ${LITE_SOURCE_DIR}/scripts/fix_macos_dylib_paths.sh
+                "$<TARGET_BUNDLE_DIR:${_target}>" "1"
+                "${VCPKG_INSTALLED_DIR}"
+                "${Qt6_DIR}"
+                "${VCPKG_TARGET_TRIPLET}"
+            COMMENT "Fix dylib paths and deploy Qt translations"
+        )
+        add_custom_command(TARGET ${_target} POST_BUILD
+            COMMAND codesign --force --deep --sign -
+                "$<TARGET_BUNDLE_DIR:${_target}>"
+            COMMENT "Ad-hoc sign macOS bundle"
         )
     endif()
 
