@@ -7,6 +7,8 @@
 
 #if defined(Q_OS_WIN)
 #  define LITE_DEFAULT_EXECUTION_PROVIDER "DirectML"
+#elif defined(Q_OS_MAC)
+#  define LITE_DEFAULT_EXECUTION_PROVIDER "CoreML"
 #else
 #  define LITE_DEFAULT_EXECUTION_PROVIDER "CPU"
 #endif

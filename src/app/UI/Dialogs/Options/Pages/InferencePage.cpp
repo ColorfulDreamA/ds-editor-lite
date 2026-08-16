@@ -1,5 +1,7 @@
 #include "InferencePage.h"
 
+#include <QtGlobal>
+
 #include "Model/AppOptions/AppOptions.h"
 #include "Modules/Inference/InferEngine.h"
 #include "Modules/Inference/Utils/DmlGpuUtils.h"
@@ -69,9 +71,13 @@ void InferencePage::requestGpuDetection() {
     const auto provider = m_cbExecutionProvider->currentText();
     m_requestedGpuProvider = provider;
 
-    const bool needsGpu = provider != QStringLiteral("CPU");
+    const bool needsGpu = provider == QStringLiteral("DirectML") ||
+                          provider == QStringLiteral("CUDA");
     m_deviceCard->setItemVisible(m_gpuItem, needsGpu);
     if (!needsGpu) {
+        const QSignalBlocker blocker(m_cbDeviceList);
+        m_cbDeviceList->clear();
+        m_cbDeviceList->setEnabled(false);
         return;
     }
 
@@ -207,7 +213,9 @@ void InferencePage::modifyOption() {
     const auto option = appOptions->inference();
 
     option->executionProvider = m_cbExecutionProvider->currentText();
-    if (option->executionProvider != QStringLiteral("CPU") && m_cbDeviceList->isEnabled()) {
+    const bool needsGpu = option->executionProvider == QStringLiteral("DirectML") ||
+                          option->executionProvider == QStringLiteral("CUDA");
+    if (needsGpu && m_cbDeviceList->isEnabled()) {
         if (m_cbDeviceList->currentData(IsDefaultGpuRole).toBool() == true) {
             option->selectedGpuIndex = -1;
             option->selectedGpuId = {};
@@ -233,11 +241,16 @@ QWidget *InferencePage::createContentWidget() {
 #ifdef ONNXRUNTIME_ENABLE_CUDA
     constexpr int epIndexCuda = 2;
 #endif
+    int epIndexCoreML = -1;
     m_cbExecutionProvider = new ComboBox();
     m_cbExecutionProvider->insertItem(epIndexCpu, "CPU");
     m_cbExecutionProvider->insertItem(epIndexDirectML, "DirectML");
 #ifdef ONNXRUNTIME_ENABLE_CUDA
     m_cbExecutionProvider->insertItem(epIndexCuda, "CUDA");
+#endif
+#ifdef Q_OS_MAC
+    epIndexCoreML = m_cbExecutionProvider->count();
+    m_cbExecutionProvider->insertItem(epIndexCoreML, "CoreML");
 #endif
     if (option->executionProvider == "CPU")
         m_cbExecutionProvider->setCurrentIndex(epIndexCpu);
@@ -246,6 +259,10 @@ QWidget *InferencePage::createContentWidget() {
 #ifdef ONNXRUNTIME_ENABLE_CUDA
     else if (option->executionProvider == "CUDA")
         m_cbExecutionProvider->setCurrentIndex(epIndexCuda);
+#endif
+#ifdef Q_OS_MAC
+    else if (option->executionProvider == "CoreML" && epIndexCoreML >= 0)
+        m_cbExecutionProvider->setCurrentIndex(epIndexCoreML);
 #endif
 
     // Device - GPU
